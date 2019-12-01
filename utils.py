@@ -54,7 +54,7 @@ def preprocess_fit_train_image(images, res):
     return images
 
 def load_data(dataset_name) :
-    x = glob(os.path.join("./dataset", dataset_name, '*.*'))
+    x = glob(os.path.join("./dataset", dataset_name, '**', '*.*'))
 
     return x
 

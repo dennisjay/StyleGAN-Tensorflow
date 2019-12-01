@@ -312,18 +312,22 @@ class StyleGAN(object):
                 else:
                     alpha_assign_op = tf.assign(alpha, zero_constant)
 
+                image_class = ImageData(res)
+                main_ds = tf.data.Dataset.from_tensor_slices(self.dataset)
+                main_ds = main_ds. \
+                    apply(shuffle_and_repeat(self.dataset_num)). \
+                    apply(map_and_batch(image_class.image_processing, batch_size, num_parallel_batches=32, drop_remainder=True)). \
+                    prefetch(self.gpu_num * 256)
+
                 with tf.control_dependencies([alpha_assign_op]):
                     for gpu_id in range(self.gpu_num):
                         with tf.device(tf.DeviceSpec(device_type="GPU", device_index=gpu_id)):
                             with tf.variable_scope(tf.get_variable_scope(), reuse=(gpu_id > 0)):
                                 # images
                                 gpu_device = '/gpu:{}'.format(gpu_id)
-                                image_class = ImageData(res)
-                                inputs = tf.data.Dataset.from_tensor_slices(self.dataset)
 
-                                inputs = inputs. \
-                                    apply(shuffle_and_repeat(self.dataset_num)). \
-                                    apply(map_and_batch(image_class.image_processing, batch_size, num_parallel_batches=16, drop_remainder=True)). \
+                                inputs = main_ds. \
+                                    shard(self.gpu_num, gpu_id). \
                                     apply(prefetch_to_device(gpu_device, None))
                                     # When using dataset.prefetch, use buffer_size=None to let it detect optimal buffer size
 
