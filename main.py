@@ -6,7 +6,7 @@ from utils import *
 def parse_args():
     desc = "Tensorflow implementation of StyleGAN"
     parser = argparse.ArgumentParser(description=desc)
-    parser.add_argument('--phase', type=str, default='train', help='[train, test, draw]')
+    parser.add_argument('--phase', type=str, default='train', help='[train, test, draw, export]')
     parser.add_argument('--draw', type=str, default='uncurated', help='[uncurated, style_mix, truncation_trick]')
     parser.add_argument('--dataset', type=str, default='FFHQ', help='The dataset name what you want to generate')
 
@@ -65,8 +65,11 @@ def main():
     if args is None:
       exit()
 
+    config = tf.ConfigProto(allow_soft_placement=True)
+    config.gpu_options.allow_growth = True
+
     # open session
-    with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
+    with tf.Session(config=config) as sess:
 
         gan = StyleGAN(sess, args)
 
@@ -85,6 +88,10 @@ def main():
             gan.test()
             print(" [*] Test finished!")
 
+        if args.phase == 'export' :
+            gan.export()
+            print(" [*] Export finished!")
+    
         if args.phase == 'draw' :
             if args.draw == 'style_mix' :
                 gan.draw_style_mixing_figure()

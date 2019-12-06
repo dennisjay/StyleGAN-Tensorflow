@@ -247,7 +247,7 @@ def get_style_class(resolutions, featuremaps) :
 
     return coarse_styles, middle_styles, fine_styles
 
-def synthesis_const_block(res, w_broadcasted, n_f, sn=False):
+def synthesis_const_block(res, w_broadcasted, n_f, sn=False, noise=True):
     w0 = w_broadcasted[:, 0]
     w1 = w_broadcasted[:, 1]
 
@@ -259,7 +259,8 @@ def synthesis_const_block(res, w_broadcasted, n_f, sn=False):
             x = tf.get_variable('Const', shape=[1, 4, 4, n_f], dtype=tf.float32, initializer=tf.initializers.ones())
             x = tf.tile(x, [batch_size, 1, 1, 1])
 
-            x = apply_noise(x) # B module
+            if noise:
+                x = apply_noise(x) # B module
             x = apply_bias(x, lrmul=1.0)
 
             x = lrelu(x, 0.2)
@@ -268,7 +269,8 @@ def synthesis_const_block(res, w_broadcasted, n_f, sn=False):
         with tf.variable_scope('Conv'):
             x = conv(x, channels=n_f, kernel=3, stride=1, gain=np.sqrt(2), lrmul=1.0, sn=sn)
 
-            x = apply_noise(x) # B module
+            if noise:
+                x = apply_noise(x) # B module
             x = apply_bias(x, lrmul=1.0)
 
             x = lrelu(x, 0.2)
@@ -276,7 +278,7 @@ def synthesis_const_block(res, w_broadcasted, n_f, sn=False):
 
     return x
 
-def synthesis_block(x, res, w_broadcasted, layer_index, n_f, sn=False):
+def synthesis_block(x, res, w_broadcasted, layer_index, n_f, sn=False, noise=True):
     w0 = w_broadcasted[:, layer_index]
     w1 = w_broadcasted[:, layer_index + 1]
 
@@ -285,7 +287,8 @@ def synthesis_block(x, res, w_broadcasted, layer_index, n_f, sn=False):
             x = upscale_conv(x, n_f, kernel=3, gain=np.sqrt(2), lrmul=1.0, sn=sn)
             x = blur2d(x, [1, 2, 1])
 
-            x = apply_noise(x) # B module
+            if noise:
+                x = apply_noise(x) # B module
             x = apply_bias(x, lrmul=1.0)
 
             x = lrelu(x, 0.2)
@@ -293,8 +296,9 @@ def synthesis_block(x, res, w_broadcasted, layer_index, n_f, sn=False):
 
         with tf.variable_scope('Conv1'):
             x = conv(x, n_f, kernel=3, stride=1, gain=np.sqrt(2), lrmul=1.0, sn=sn)
-
-            x = apply_noise(x) # B module
+            
+            if noise:
+                x = apply_noise(x) # B module
             x = apply_bias(x, lrmul=1.0)
 
             x = lrelu(x, 0.2)
@@ -623,7 +627,7 @@ def get_batch_sizes(gpu_num) :
         x = OrderedDict([(4, 128), (8, 64), (16, 32), (32, 16), (64, 8), (128, 4), (256, 4), (512, 4), (1024, 4)])
 
     elif gpu_num == 7 or gpu_num == 8 or gpu_num == 9 :
-        x = OrderedDict([(4, 128), (8, 64), (16, 32), (32, 16), (64, 8), (128, 4), (256, 4), (512, 4), (1024, 4)])
+        x = OrderedDict([(4, 128), (8, 64), (16, 32), (32, 16), (64, 8), (128, 4), (256, 4), (512, 1), (1024, 1)])
 
     else : # >= 10
         x = OrderedDict([(4, 32), (8, 16), (16, 8), (32, 4), (64, 2), (128, 2), (256, 2), (512, 2), (1024, 2)])

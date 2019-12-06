@@ -114,7 +114,7 @@ class StyleGAN(object):
 
         return x
 
-    def g_synthesis(self, w_broadcasted, alpha, resolutions, featuremaps, reuse=tf.AUTO_REUSE):
+    def g_synthesis(self, w_broadcasted, alpha, resolutions, featuremaps, reuse=tf.AUTO_REUSE, noise=True):
         with tf.variable_scope('g_synthesis', reuse=reuse):
             coarse_styles, middle_styles, fine_styles = get_style_class(resolutions, featuremaps)
             layer_index = 2
@@ -123,7 +123,7 @@ class StyleGAN(object):
             res = resolutions[0]
             n_f = featuremaps[0]
 
-            x = synthesis_const_block(res, w_broadcasted, n_f, self.sn)
+            x = synthesis_const_block(res, w_broadcasted, n_f, self.sn, noise=noise)
 
             """ remaining layers """
             if self.progressive :
@@ -133,7 +133,7 @@ class StyleGAN(object):
                 # Coarse style [4 ~ 8]
                 # pose, hair, face shape
                 for res, n_f in coarse_styles.items():
-                    x = synthesis_block(x, res, w_broadcasted, layer_index, n_f, sn=self.sn)
+                    x = synthesis_block(x, res, w_broadcasted, layer_index, n_f, sn=self.sn, noise=noise)
                     img = torgb(x, res, sn=self.sn)
                     images_out = upscale2d(images_out)
                     images_out = smooth_transition(images_out, img, res, resolutions[-1], alpha)
@@ -143,7 +143,7 @@ class StyleGAN(object):
                 # Middle style [16 ~ 32]
                 # facial features, eye
                 for res, n_f in middle_styles.items():
-                    x = synthesis_block(x, res, w_broadcasted, layer_index, n_f, sn=self.sn)
+                    x = synthesis_block(x, res, w_broadcasted, layer_index, n_f, sn=self.sn, noise=noise)
                     img = torgb(x, res, sn=self.sn)
                     images_out = upscale2d(images_out)
                     images_out = smooth_transition(images_out, img, res, resolutions[-1], alpha)
@@ -153,7 +153,7 @@ class StyleGAN(object):
                 # Fine style [64 ~ 1024]
                 # color scheme
                 for res, n_f in fine_styles.items():
-                    x = synthesis_block(x, res, w_broadcasted, layer_index, n_f, sn=self.sn)
+                    x = synthesis_block(x, res, w_broadcasted, layer_index, n_f, sn=self.sn, noise=noise)
                     img = torgb(x, res, sn=self.sn)
                     images_out = upscale2d(images_out)
                     images_out = smooth_transition(images_out, img, res, resolutions[-1], alpha)
@@ -162,14 +162,14 @@ class StyleGAN(object):
 
             else :
                 for res, n_f in zip(resolutions[1:], featuremaps[1:]) :
-                    x = synthesis_block(x, res, w_broadcasted, layer_index, n_f, sn=self.sn)
+                    x = synthesis_block(x, res, w_broadcasted, layer_index, n_f, sn=self.sn, noise=noise)
 
                     layer_index += 2
                 images_out = torgb(x, resolutions[-1], sn=self.sn)
 
             return images_out
 
-    def generator(self, z, alpha, target_img_size, is_training=True, reuse=tf.AUTO_REUSE):
+    def generator(self, z, alpha, target_img_size, is_training=True, reuse=tf.AUTO_REUSE, noise=True):
         with tf.variable_scope("generator", reuse=reuse):
             resolutions = resolution_list(target_img_size)
             featuremaps = featuremap_list(target_img_size)
@@ -195,7 +195,7 @@ class StyleGAN(object):
                 w_broadcasted = self.truncation_trick(n_broadcast, w_broadcasted, w_avg, self.truncation_psi)
 
             """ synthesis layers """
-            x = self.g_synthesis(w_broadcasted, alpha, resolutions, featuremaps)
+            x = self.g_synthesis(w_broadcasted, alpha, resolutions, featuremaps, noise=noise)
 
             return x
 
@@ -586,6 +586,31 @@ class StyleGAN(object):
                 save_images(samples[:image_frame_dim * image_frame_dim, :, :, :], [image_frame_dim, image_frame_dim],
                             '{}/test_fake_img_{}_{}.jpg'.format(result_dir, self.img_size, i))
 
+    def export(self):
+
+        tf.global_variables_initializer().run()
+        self.saver = tf.train.Saver()
+        could_load, checkpoint_counter = self.load(self.checkpoint_dir)
+        result_dir = os.path.join(self.result_dir, self.model_dir, 'paper_figure')
+        check_folder(result_dir)
+
+        if could_load:
+            print(" [*] Load SUCCESS")
+        else:
+            print(" [!] Load failed...")
+
+        alpha = tf.constant(0.0, dtype=tf.float32, shape=[])
+        latents = tf.placeholder(tf.float32, shape=(None, self.z_dim), name='latents_placeholder') 
+       
+        generator_export = tf.identity( self.generator(latents, alpha=alpha, target_img_size=self.img_size, is_training=False, noise=False), name="images_output")
+
+        result_dir = os.path.join(self.result_dir, self.model_dir, 'exported_model')
+        tf.saved_model.simple_save(self.sess,
+            result_dir,
+            inputs={"latents_placeholder": latents},
+            outputs={"images_output": generator_export})
+                
+                
     def draw_uncurated_result_figure(self):
 
         tf.global_variables_initializer().run()
