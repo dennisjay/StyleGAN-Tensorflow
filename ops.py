@@ -452,11 +452,12 @@ def _upscale2d(x, factor=2, gain=1):
     if factor == 1:
         return x
 
-    # Upscale using tf.tile().
+    ### Upscale using tf.tile().
     s = x.shape # [bs, h, w, c]
     x = tf.reshape(x, [-1, s[1], 1, s[2], 1, s[-1]])
     x = tf.tile(x, [1, 1, factor, 1, factor, 1])
     x = tf.reshape(x, [-1, s[1] * factor, s[2] * factor, s[-1]])
+   
     return x
 
 

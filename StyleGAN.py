@@ -587,7 +587,16 @@ class StyleGAN(object):
                             '{}/test_fake_img_{}_{}.jpg'.format(result_dir, self.img_size, i))
 
     def export(self):
+        latents, generator_export = self.get_generator()
 
+        result_dir = os.path.join(self.result_dir, self.model_dir, 'exported_model')
+        tf.saved_model.simple_save(self.sess,
+            result_dir,
+            inputs={"latents_placeholder": latents},
+            outputs={"images_output": generator_export})
+    
+    
+    def get_generator(self):
         tf.global_variables_initializer().run()
         self.saver = tf.train.Saver()
         could_load, checkpoint_counter = self.load(self.checkpoint_dir)
@@ -602,14 +611,9 @@ class StyleGAN(object):
         alpha = tf.constant(0.0, dtype=tf.float32, shape=[])
         latents = tf.placeholder(tf.float32, shape=(None, self.z_dim), name='latents_placeholder') 
        
-        generator_export = tf.identity( self.generator(latents, alpha=alpha, target_img_size=self.img_size, is_training=False, noise=False), name="images_output")
+        return latents, self.generator(latents, alpha=alpha, target_img_size=self.img_size, is_training=False, noise=False)
 
-        result_dir = os.path.join(self.result_dir, self.model_dir, 'exported_model')
-        tf.saved_model.simple_save(self.sess,
-            result_dir,
-            inputs={"latents_placeholder": latents},
-            outputs={"images_output": generator_export})
-                
+    
                 
     def draw_uncurated_result_figure(self):
 
